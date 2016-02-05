@@ -1,0 +1,84 @@
+---
+- hosts: all
+  vars:
+    user: "vagrant"
+    virtualenv_dir: "/home/{{ user }}/app"
+    app_dir: "/home/{{ user }}"
+    app_name: "espresso"
+    host: "localhost"
+  tasks:
+    - name: update apt cache
+      apt: update_cache=yes cache_valid_time=86400
+      become: yes
+      become_method: sudo
+
+    - name: install packages
+      apt: name={{ item }} state=present
+      with_items:
+        - mongodb
+        - nginx
+        - python-virtualenv
+        - python-dev
+        - build-essential
+        - supervisor
+        - git
+      become: yes
+      become_method: sudo
+
+    - name: create dirs structure
+      shell: mkdir -p {{ item }}
+      with_items:
+        - "{{ app_dir }}/app"
+        - "{{ app_dir }}/app/src"
+        - "{{ app_dir }}/conf/uwsgi"
+        - "{{ app_dir }}/conf/nginx"
+        - "{{ app_dir }}/conf/supervisord"
+        - "{{ app_dir }}/run"
+        - "{{ app_dir }}/logs"
+
+# Right now ansible git module does not support 'git pull' on already cloned repo, so temporary fix to delete exisiting dir (in case or re-deply/re-provision)
+    - name: Remove old/existing code
+      file: path=~vagrant/app/src/ state=absent
+
+    - name: get code
+      git: repo=https://github.com/sharma-mohit/flask-mongo.git
+       dest=~vagrant/app/src/
+       force=yes
+       update=yes
+
+    - name: check if virtualenv already exists
+      stat: path={{ virtualenv_dir }}/bin/pip
+      register: venv_dir
+
+    - name: create virtualenv
+      shell: virtualenv {{ virtualenv_dir }}
+      when: venv_dir.stat.isreg is not defined
+
+    - name: install web application dependencies
+      pip: requirements=~vagrant/app/src/requirements.txt
+           virtualenv={{ virtualenv_dir }}
+
+    - name: put templates
+      template: src={{ item.src }} dest={{ item.dest }} owner={{ user }}
+      with_items:
+        - { src: 'conf/uwsgi/uwsgi.ini', dest: '{{app_dir}}/conf/uwsgi/uwsgi.ini'}
+        - { src: 'conf/nginx/app.conf', dest: '{{app_dir}}/conf/nginx/app.conf'}
+        - { src: 'conf/nginx/vhost.conf', dest: '{{app_dir}}/conf/nginx/vhost.conf'}
+
+    - name: put system templates
+      template: src={{ item.src }} dest={{ item.dest }} owner=root
+      with_items:
+        - { src: 'conf/sys/nginx/apps.conf', dest: '/etc/nginx/conf.d/apps.conf'}
+        - { src: 'conf/sys/supervisord/supervisord.conf', dest: '/etc/supervisor/conf.d/testapp.conf'}
+      become: yes
+      become_method: sudo
+
+    - name: restart nginx
+      action: service name=nginx state=restarted
+      become: yes
+      become_method: sudo
+
+    - name: restart supervisor
+      action: service name=supervisor state=restarted
+      become: yes
+      become_method: sudo
