@@ -4,7 +4,7 @@ import json
 from mainapp import db
 from collections import OrderedDict
 
-
+# Same reason for UID to be string here also as in views.py
 class Record(db.Document):
     uid = db.StringField(required=True)
     name = db.StringField(max_length=255, required=True)

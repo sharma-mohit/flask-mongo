@@ -4,7 +4,7 @@ from flask import jsonify, request
 from mainapp.api.models import Record
 from . import api
 
-
+# Note here that UID is string, because checksum user might get confused when checksum mismatches due to quotes in input and python treating it as int even if quotes are provided.
 @api.route('/<string:uid>/<date>/', methods=['GET'])
 def get_record(uid, date):
     minDate = datetime.datetime.strptime(date, "%Y-%m-%d")
