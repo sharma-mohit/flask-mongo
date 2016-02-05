@@ -36,15 +36,15 @@
         - "{{ app_dir }}/run"
         - "{{ app_dir }}/logs"
 
-# Right now ansible git module does not support 'git pull' on already cloned repo, so temporary fix to delete exisiting dir (in case or re-deply/re-provision)
-    - name: Remove old/existing code
-      file: path=~vagrant/app/src/ state=absent
-
-    - name: get code
-      git: repo=https://github.com/sharma-mohit/flask-mongo.git
-       dest=~vagrant/app/src/
-       force=yes
-       update=yes
+    - name: copy code
+      copy: src={{ item }} dest=~vagrant/app/src/ owner={{ user }}
+      with_items:
+       - mainapp
+       - manage.py
+       - requirements.txt
+       - run.py
+       - test.py
+       - tests
 
     - name: check if virtualenv already exists
       stat: path={{ virtualenv_dir }}/bin/pip
